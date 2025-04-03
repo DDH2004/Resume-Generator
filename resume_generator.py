@@ -87,7 +87,7 @@ class ResumeGenerator:
             sorting resume sections by relevance.
         generate_markdown_resume(tailored_resume):
             Generates a Markdown version of the tailored resume.
-        export_tailored_resume(job_description, output_format="markdown", output_file=None):
+        export_tailored_resume(job_description, output_format="markdown", output_file=None, output_dir=None):
             Exports a tailored resume in the specified format (JSON or Markdown) to a file.
     """
 
@@ -492,7 +492,7 @@ class ResumeGenerator:
         
         return "\n".join(markdown)
 
-    def export_tailored_resume(self, job_description, output_format="markdown", output_file=None):
+    def export_tailored_resume(self, job_description, output_format="markdown", output_file=None, output_dir=None):
         """Export a tailored resume in the specified format."""
         tailored_resume = self.generate_tailored_resume(job_description)
         
@@ -505,17 +505,26 @@ class ResumeGenerator:
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
         
+        # Determine file name
         if output_file:
             file_name = output_file if "." in output_file else f"{output_file}.{file_extension}"
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_name = f"tailored_resume_{timestamp}.{file_extension}"
         
-        with open(file_name, 'w') as file:
+        # Handle directory
+        if output_dir:
+            # Create directory if it doesn't exist
+            os.makedirs(output_dir, exist_ok=True)
+            file_path = os.path.join(output_dir, file_name)
+        else:
+            file_path = file_name
+        
+        with open(file_path, 'w') as file:
             file.write(output)
         
-        print(f"Resume exported to {file_name}")
-        return file_name, output
+        print(f"Resume exported to {file_path}")
+        return file_path, output
 
 
 def main():
@@ -523,6 +532,7 @@ def main():
     parser.add_argument('--resume', default='resume_data.json', help='Path to the JSON resume data file')
     parser.add_argument('--job', required=True, help='Path to a text file containing the job description')
     parser.add_argument('--output', help='Output file name')
+    parser.add_argument('--output-dir', help='Target directory for the generated resume')
     parser.add_argument('--format', default='markdown', choices=['markdown', 'json'], help='Output format')
 
     args = parser.parse_args()
@@ -535,8 +545,7 @@ def main():
         return
 
     generator = ResumeGenerator(args.resume)
-    generator.export_tailored_resume(job_description, args.format, args.output)
-
+    generator.export_tailored_resume(job_description, args.format, args.output, args.output_dir)
 
 
 if __name__ == "__main__":
