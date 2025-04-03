@@ -91,6 +91,8 @@ class ResumeGenerator:
             Generates an HTML version of the tailored resume with CSS styling.
         export_tailored_resume(job_description, output_format="markdown", output_file=None, output_dir=None):
             Exports a tailored resume in the specified format (JSON, Markdown, HTML, or PDF) to a file.
+        select_ai_style_for_job(job_description):
+            Uses a transformer model to select the optimal resume style based on job description.
     """
 
     def __init__(self, resume_file='resume_data.json'):
@@ -495,22 +497,35 @@ class ResumeGenerator:
         return "\n".join(markdown)
 
     def generate_html_resume(self, tailored_resume):
-        """Generate an HTML version of the tailored resume with CSS styling."""
+        """Generate an HTML version with AI-selected styling."""
+        # Get job description and analysis
+        job_analysis = tailored_resume.get("job_analysis", {})
+        job_description = "Technology job with programming requirements"  # Default fallback
+        
+        # Use the job description if stored in the analysis
+        if "original_description" in job_analysis:
+            job_description = job_analysis["original_description"]
+        
+        # Get AI-recommended style
+        style = self.select_ai_style_for_job(job_description)  # Option 1: Local model
+        
+        # Use style in HTML generation
         html = [
             '<!DOCTYPE html>',
             '<html lang="en">',
             '<head>',
             '  <meta charset="UTF-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
-            '  <title>Professional Resume</title>',
+            f'  <title>Resume - {style.get("layout", "Professional")} Style</title>',
             '  <style>',
-            '    body { font-family: \'Calibri\', \'Arial\', sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }',
-            '    h1 { color: #2a5885; margin-bottom: 5px; }',
-            '    h2 { color: #2a5885; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 20px; }',
+            f'    @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Georgia&family=Poppins:wght@400;600&family=Lato:wght@400;700&family=Libre+Baskerville&display=swap");',
+            f'    body {{ font-family: {style.get("font", "Calibri, Arial, sans-serif")}; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: {style.get("secondary_color", "#333")}; }}',
+            f'    h1 {{ color: {style.get("primary_color", "#2a5885")}; margin-bottom: 5px; }}',
+            f'    h2 {{ color: {style.get("primary_color", "#2a5885")}; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 20px; }}',
             '    h3 { margin-bottom: 0; }',
             '    .contact-info { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }',
             '    .contact-item { margin-right: 20px; }',
-            '    .date { color: #777; font-style: italic; margin: 0; }',
+            f'    .date {{ color: {style.get("accent", "#777")}; font-style: italic; margin: 0; }}',
             '    .job-title { margin-bottom: 0; }',
             '    .company { margin-top: 0; }',
             '    ul { padding-left: 20px; }',
@@ -592,7 +607,7 @@ class ResumeGenerator:
             for job in tailored_resume["work"]:
                 html.append('    <div class="job">')
                 position = job.get("position", "")
-                company = job.get("name", "")  # Using 'name' field
+                company = job.get("company", "") or job.get("name", "")  # Try both fields
                 
                 html.append(f'      <h3>{position}</h3>')
                 html.append(f'      <p class="company">{company}</p>')
@@ -620,8 +635,6 @@ class ResumeGenerator:
                 html.append('    </div>')
             
             html.append('  </div>')
-        
-        # Add other sections (education, projects, certifications) similarly
         
         # Education
         if "education" in tailored_resume and tailored_resume["education"]:
@@ -789,6 +802,100 @@ class ResumeGenerator:
         
         print(f"Resume exported to {file_path}")
         return file_path, output
+
+    def select_ai_style_for_job(self, job_description):
+        """Use a transformer model to select the optimal resume style."""
+        try:
+            from transformers import pipeline
+            
+            # Create a text classification pipeline
+            classifier = pipeline(
+                "text-classification", 
+                model="distilbert-base-uncased-finetuned-sst-2-english",  # Using a small model as example
+                return_all_scores=True
+            )
+            
+            # Define industry categories that influence style
+            industries = [
+                "technology software development programming",
+                "finance banking accounting investment",
+                "creative design marketing arts media",
+                "healthcare medical pharmaceutical research",
+                "legal law corporate compliance",
+                "academic research science education"
+            ]
+            
+            # Use model to calculate relevance scores for each industry
+            scores = {}
+            for industry in industries:
+                # Compare job description with industry keywords
+                result = classifier(f"This job is related to {industry}")
+                pos_score = [r['score'] for r in result[0] if r['label'] == 'POSITIVE'][0]
+                scores[industry] = pos_score
+            
+            # Find best matching industry
+            best_match = max(scores.items(), key=lambda x: x[1])[0]
+            
+            # Select style based on industry
+            if "technology" in best_match:
+                return {
+                    "primary_color": "#2563eb",  # Blue
+                    "secondary_color": "#1e293b",
+                    "font": "'Roboto', sans-serif",
+                    "layout": "modern",
+                    "accent": "technical"
+                }
+            elif "finance" in best_match:
+                return {
+                    "primary_color": "#064e3b",  # Dark green
+                    "secondary_color": "#334155",
+                    "font": "'Georgia', serif",
+                    "layout": "traditional", 
+                    "accent": "conservative"
+                }
+            elif "creative" in best_match:
+                return {
+                    "primary_color": "#9333ea",  # Purple
+                    "secondary_color": "#3b0764",
+                    "font": "'Poppins', sans-serif",
+                    "layout": "creative",
+                    "accent": "bold"
+                }
+            elif "healthcare" in best_match:
+                return {
+                    "primary_color": "#0891b2",  # Teal
+                    "secondary_color": "#083344",
+                    "font": "'Lato', sans-serif",
+                    "layout": "clean",
+                    "accent": "compassionate"
+                }
+            elif "legal" in best_match:
+                return {
+                    "primary_color": "#7c2d12",  # Brown
+                    "secondary_color": "#1c1917",
+                    "font": "'Libre Baskerville', serif",
+                    "layout": "structured",
+                    "accent": "authoritative"
+                }
+            else:
+                return {
+                    "primary_color": "#2a5885",  # Default blue
+                    "secondary_color": "#333333",
+                    "font": "'Calibri', 'Arial', sans-serif",
+                    "layout": "balanced",
+                    "accent": "professional"
+                }
+                
+        except ImportError:
+            print("Transformers library not available. Using default styling.")
+            # Return default style
+            return {
+                "primary_color": "#2a5885",
+                "secondary_color": "#333333",
+                "font": "'Calibri', 'Arial', sans-serif",
+                "layout": "standard",
+                "accent": "professional"
+            }
 
 
 def main():
