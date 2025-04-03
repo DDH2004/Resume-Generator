@@ -87,8 +87,10 @@ class ResumeGenerator:
             sorting resume sections by relevance.
         generate_markdown_resume(tailored_resume):
             Generates a Markdown version of the tailored resume.
+        generate_html_resume(tailored_resume):
+            Generates an HTML version of the tailored resume with CSS styling.
         export_tailored_resume(job_description, output_format="markdown", output_file=None, output_dir=None):
-            Exports a tailored resume in the specified format (JSON or Markdown) to a file.
+            Exports a tailored resume in the specified format (JSON, Markdown, HTML, or PDF) to a file.
     """
 
     def __init__(self, resume_file='resume_data.json'):
@@ -492,6 +494,241 @@ class ResumeGenerator:
         
         return "\n".join(markdown)
 
+    def generate_html_resume(self, tailored_resume):
+        """Generate an HTML version of the tailored resume with CSS styling."""
+        html = [
+            '<!DOCTYPE html>',
+            '<html lang="en">',
+            '<head>',
+            '  <meta charset="UTF-8">',
+            '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '  <title>Professional Resume</title>',
+            '  <style>',
+            '    body { font-family: \'Calibri\', \'Arial\', sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }',
+            '    h1 { color: #2a5885; margin-bottom: 5px; }',
+            '    h2 { color: #2a5885; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 20px; }',
+            '    h3 { margin-bottom: 0; }',
+            '    .contact-info { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }',
+            '    .contact-item { margin-right: 20px; }',
+            '    .date { color: #777; font-style: italic; margin: 0; }',
+            '    .job-title { margin-bottom: 0; }',
+            '    .company { margin-top: 0; }',
+            '    ul { padding-left: 20px; }',
+            '    li { margin-bottom: 5px; }',
+            '    .skills-container { display: flex; flex-wrap: wrap; }',
+            '    .skill-category { width: 48%; margin-right: 2%; margin-bottom: 15px; }',
+            '    .section { margin-bottom: 20px; }',
+            '    .project { margin-bottom: 15px; }',
+            '    .match-analysis { background-color: #f5f5f5; padding: 15px; border-radius: 5px; }',
+            '    @media print {',
+            '      body { padding: 0; }',
+            '      .match-analysis { display: none; }',
+            '    }',
+            '  </style>',
+            '</head>',
+            '<body>'
+        ]
+        
+        # Header
+        basics = tailored_resume.get("basics", {})
+        html.append(f'  <div class="header-section">')
+        html.append(f'    <h1>{basics.get("name", "Your Name")}</h1>')
+        if basics.get("label"):
+            html.append(f'    <p>{basics.get("label")}</p>')
+        
+        # Contact Info
+        html.append('    <div class="contact-info">')
+        if "email" in basics:
+            html.append(f'      <div class="contact-item">📧 {basics["email"]}</div>')
+        if "phone" in basics:
+            html.append(f'      <div class="contact-item">📱 {basics["phone"]}</div>')
+        if "website" in basics:
+            html.append(f'      <div class="contact-item">🌐 <a href="{basics["website"]}">{basics["website"]}</a></div>')
+        if "location" in basics:
+            location = basics["location"]
+            location_str = f'{location.get("city", "")}, {location.get("region", "")}'
+            html.append(f'      <div class="contact-item">📍 {location_str}</div>')
+        html.append('    </div>')
+        
+        # Profiles
+        if "profiles" in basics and basics["profiles"]:
+            html.append('    <div class="contact-info">')
+            for profile in basics["profiles"]:
+                html.append(f'      <div class="contact-item">{profile["network"]}: <a href="{profile["url"]}">{profile.get("username", "Profile")}</a></div>')
+            html.append('    </div>')
+        html.append('  </div>')
+        
+        # Summary
+        if "summary" in basics:
+            html.append('  <div class="section">')
+            html.append('    <h2>Summary</h2>')
+            html.append(f'    <p>{basics["summary"]}</p>')
+            html.append('  </div>')
+        
+        # Skills
+        if "skills" in tailored_resume and tailored_resume["skills"]:
+            html.append('  <div class="section">')
+            html.append('    <h2>Skills</h2>')
+            html.append('    <div class="skills-container">')
+            
+            for skill in tailored_resume["skills"]:
+                html.append('      <div class="skill-category">')
+                html.append(f'        <h3>{skill["name"]}</h3>')
+                if "keywords" in skill and skill["keywords"]:
+                    html.append('        <ul>')
+                    for keyword in skill["keywords"]:
+                        html.append(f'          <li>{keyword}</li>')
+                    html.append('        </ul>')
+                html.append('      </div>')
+            
+            html.append('    </div>')
+            html.append('  </div>')
+        
+        # Work Experience
+        if "work" in tailored_resume and tailored_resume["work"]:
+            html.append('  <div class="section">')
+            html.append('    <h2>Work Experience</h2>')
+            
+            for job in tailored_resume["work"]:
+                html.append('    <div class="job">')
+                position = job.get("position", "")
+                company = job.get("name", "")  # Using 'name' field
+                
+                html.append(f'      <h3>{position}</h3>')
+                html.append(f'      <p class="company">{company}</p>')
+                
+                dates = []
+                if "startDate" in job:
+                    start_date = job["startDate"].split("-")[0] if "-" in job["startDate"] else job["startDate"]
+                    dates.append(start_date)
+                if "endDate" in job:
+                    end_date = job["endDate"].split("-")[0] if "-" in job["endDate"] else job["endDate"]
+                    dates.append(end_date)
+                
+                if dates:
+                    html.append(f'      <p class="date">{" - ".join(dates)}</p>')
+                
+                if "summary" in job:
+                    html.append(f'      <p>{job["summary"]}</p>')
+                
+                if "highlights" in job and job["highlights"]:
+                    html.append('      <ul>')
+                    for highlight in job["highlights"]:
+                        html.append(f'        <li>{highlight}</li>')
+                    html.append('      </ul>')
+                
+                html.append('    </div>')
+            
+            html.append('  </div>')
+        
+        # Add other sections (education, projects, certifications) similarly
+        
+        # Education
+        if "education" in tailored_resume and tailored_resume["education"]:
+            html.append('  <div class="section">')
+            html.append('    <h2>Education</h2>')
+            
+            for edu in tailored_resume["education"]:
+                html.append('    <div class="education">')
+                degree = edu.get("studyType", "")
+                area = edu.get("area", "")
+                institution = edu.get("institution", "")
+                
+                html.append(f'      <h3>{degree} in {area}</h3>')
+                html.append(f'      <p class="company">{institution}</p>')
+                
+                dates = []
+                if "startDate" in edu:
+                    start_date = edu["startDate"].split("-")[0] if "-" in edu["startDate"] else edu["startDate"]
+                    dates.append(start_date)
+                if "endDate" in edu:
+                    end_date = edu["endDate"].split("-")[0] if "-" in edu["endDate"] else edu["endDate"]
+                    dates.append(end_date)
+                
+                if dates:
+                    html.append(f'      <p class="date">{" - ".join(dates)}</p>')
+                
+                if "gpa" in edu:
+                    html.append(f'      <p>GPA: {edu["gpa"]}</p>')
+                
+                if "courses" in edu and edu["courses"]:
+                    html.append('      <p><strong>Relevant Coursework:</strong></p>')
+                    html.append('      <ul>')
+                    for course in edu["courses"]:
+                        html.append(f'        <li>{course}</li>')
+                    html.append('      </ul>')
+                
+                html.append('    </div>')
+            
+            html.append('  </div>')
+        
+        # Projects
+        if "projects" in tailored_resume and tailored_resume["projects"]:
+            html.append('  <div class="section">')
+            html.append('    <h2>Projects</h2>')
+            
+            for project in tailored_resume["projects"]:
+                html.append('    <div class="project">')
+                html.append(f'      <h3>{project.get("name", "")}</h3>')
+                
+                if "description" in project:
+                    html.append(f'      <p>{project["description"]}</p>')
+                
+                if "highlights" in project and project["highlights"]:
+                    html.append('      <ul>')
+                    for highlight in project["highlights"]:
+                        html.append(f'        <li>{highlight}</li>')
+                    html.append('      </ul>')
+                
+                if "url" in project:
+                    html.append(f'      <p><a href="{project["url"]}" target="_blank">Project Link</a></p>')
+                
+                html.append('    </div>')
+            
+            html.append('  </div>')
+        
+        # Job Match Analysis
+        if "job_analysis" in tailored_resume:
+            html.append('  <div class="section match-analysis">')
+            html.append('    <h2>Job Match Analysis</h2>')
+            html.append('    <p><em>This section is for your reference and will not appear when printed.</em></p>')
+            
+            analysis = tailored_resume["job_analysis"]
+            
+            if analysis["skills"]:
+                html.append('    <h3>Key Skills Detected</h3>')
+                html.append('    <ul>')
+                for skill in analysis["skills"]:
+                    html.append(f'      <li>{skill}</li>')
+                html.append('    </ul>')
+            
+            if analysis["experience"]:
+                html.append('    <h3>Experience Requirements</h3>')
+                html.append('    <ul>')
+                for exp in analysis["experience"]:
+                    html.append(f'      <li>{exp} years of experience</li>')
+                html.append('    </ul>')
+            
+            if analysis["education"]:
+                html.append('    <h3>Education Requirements</h3>')
+                html.append('    <ul>')
+                for edu in analysis["education"]:
+                    html.append(f'      <li>{edu.capitalize()} degree</li>')
+                html.append('    </ul>')
+            
+            html.append('    <h3>Frequently Mentioned Terms</h3>')
+            html.append('    <ul>')
+            for word, count in analysis["frequent_words"]:
+                html.append(f'      <li>{word}: {count} mentions</li>')
+            html.append('    </ul>')
+            
+            html.append('  </div>')
+        
+        html.append('</body>')
+        html.append('</html>')
+        
+        return '\n'.join(html)
+
     def export_tailored_resume(self, job_description, output_format="markdown", output_file=None, output_dir=None):
         """Export a tailored resume in the specified format."""
         tailored_resume = self.generate_tailored_resume(job_description)
@@ -502,6 +739,22 @@ class ResumeGenerator:
         elif output_format == "markdown":
             output = self.generate_markdown_resume(tailored_resume)
             file_extension = "md"
+        elif output_format == "html":
+            output = self.generate_html_resume(tailored_resume)
+            file_extension = "html"
+        elif output_format == "pdf":
+            # Generate HTML first
+            html_content = self.generate_html_resume(tailored_resume)
+            file_extension = "pdf"
+            
+            try:
+                import weasyprint
+                output = html_content  # We'll use this HTML directly when creating the PDF file
+            except ImportError:
+                print("WARNING: WeasyPrint not installed. Falling back to HTML output.")
+                print("To enable PDF output, install WeasyPrint with: pip install weasyprint")
+                output = html_content
+                file_extension = "html"
         else:
             raise ValueError(f"Unsupported output format: {output_format}")
         
@@ -520,8 +773,19 @@ class ResumeGenerator:
         else:
             file_path = file_name
         
-        with open(file_path, 'w') as file:
-            file.write(output)
+        # Write the file based on format
+        if output_format == "pdf":
+            try:
+                import weasyprint
+                html = weasyprint.HTML(string=output)
+                html.write_pdf(file_path)
+            except ImportError:
+                # Already handled above
+                with open(file_path, 'w') as file:
+                    file.write(output)
+        else:
+            with open(file_path, 'w') as file:
+                file.write(output)
         
         print(f"Resume exported to {file_path}")
         return file_path, output
@@ -533,7 +797,7 @@ def main():
     parser.add_argument('--job', required=True, help='Path to a text file containing the job description')
     parser.add_argument('--output', help='Output file name')
     parser.add_argument('--output-dir', help='Target directory for the generated resume')
-    parser.add_argument('--format', default='markdown', choices=['markdown', 'json'], help='Output format')
+    parser.add_argument('--format', default='markdown', choices=['markdown', 'json', 'html', 'pdf'], help='Output format')
 
     args = parser.parse_args()
 
