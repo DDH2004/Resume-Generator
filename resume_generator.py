@@ -89,10 +89,12 @@ class ResumeGenerator:
             Generates a Markdown version of the tailored resume.
         generate_html_resume(tailored_resume):
             Generates an HTML version of the tailored resume with CSS styling.
-        export_tailored_resume(job_description, output_format="markdown", output_file=None, output_dir=None):
+        export_tailored_resume(job_description, output_format="markdown", output_file=None, output_dir=None, page_constraints="auto"):
             Exports a tailored resume in the specified format (JSON, Markdown, HTML, or PDF) to a file.
         select_ai_style_for_job(job_description):
             Uses a transformer model to select the optimal resume style based on job description.
+        optimize_for_page_constraints(resume_data, job_description):
+            Optimizes resume content to fit on a single page.
     """
 
     def __init__(self, resume_file='resume_data.json'):
@@ -497,7 +499,7 @@ class ResumeGenerator:
         return "\n".join(markdown)
 
     def generate_html_resume(self, tailored_resume):
-        """Generate an HTML version with AI-selected styling."""
+        """Generate an HTML version with AI-selected styling and page optimization."""
         # Get job description and analysis
         job_analysis = tailored_resume.get("job_analysis", {})
         job_description = "Technology job with programming requirements"  # Default fallback
@@ -538,8 +540,44 @@ class ResumeGenerator:
             '    @media print {',
             '      body { padding: 0; }',
             '      .match-analysis { display: none; }',
+            '      /* Auto-scaling based on content density */',
+            '      .dense-content { font-size: 0.9em; line-height: 1.4; }',
+            '      .very-dense-content { font-size: 0.85em; line-height: 1.3; }',
             '    }',
+            '    /* Compact layout styles */',
+            '    .compact-layout h2 { margin-top: 12px; padding-bottom: 3px; }',
+            '    .compact-layout h3 { margin-bottom: 0; margin-top: 8px; }',
+            '    .compact-layout p { margin: 4px 0; }',
+            '    .compact-layout ul { margin: 4px 0; }',
+            '    .compact-layout li { margin-bottom: 2px; }',
+            '    .compact-layout .section { margin-bottom: 12px; }',
+            '    @page { size: letter; margin: 0.5in; }',
             '  </style>',
+            '  <script>',
+            '    window.addEventListener("load", function() {',
+            '      // Measure content height vs page height',
+            '      function checkContentFit() {',
+            '        const contentHeight = document.body.scrollHeight;',
+            '        const pageHeight = 11 * 96; // Letter size in pixels (11 inches)',
+            '        const ratio = contentHeight / pageHeight;',
+            '        ',
+            '        // Apply different density classes based on content amount',
+            '        if (ratio > 1.3) {',
+            '          document.body.classList.add("very-dense-content");',
+            '          document.body.classList.add("compact-layout");',
+            '        } else if (ratio > 1.1) {',
+            '          document.body.classList.add("dense-content");',
+            '          document.body.classList.add("compact-layout");',
+            '        } else if (ratio > 1.0) {',
+            '          document.body.classList.add("compact-layout");',
+            '        }',
+            '      }',
+            '      ',
+            '      // Run on load and print',
+            '      checkContentFit();',
+            '      window.onbeforeprint = checkContentFit;',
+            '    });',
+            '  </script>',
             '</head>',
             '<body>'
         ]
@@ -742,9 +780,13 @@ class ResumeGenerator:
         
         return '\n'.join(html)
 
-    def export_tailored_resume(self, job_description, output_format="markdown", output_file=None, output_dir=None):
-        """Export a tailored resume in the specified format."""
+    def export_tailored_resume(self, job_description, output_format="markdown", output_file=None, output_dir=None, page_constraints="auto"):
+        """Export a tailored resume in the specified format with page constraints."""
         tailored_resume = self.generate_tailored_resume(job_description)
+        
+        # Apply page constraints if needed
+        if page_constraints in ["single-page", "auto"]:
+            tailored_resume = self.optimize_for_page_constraints(tailored_resume, job_description)
         
         if output_format == "json":
             output = json.dumps(tailored_resume, indent=2)
@@ -897,6 +939,91 @@ class ResumeGenerator:
                 "accent": "professional"
             }
 
+    def optimize_for_page_constraints(self, resume_data, job_description):
+        """Optimize resume content to fit on a single page."""
+        # Create a deep copy of the resume data
+        optimized = json.loads(json.dumps(resume_data))
+        
+        # Get job analysis
+        job_analysis = resume_data.get("job_analysis", {})
+        required_skills = job_analysis.get("skills", [])
+        
+        # 1. Calculate total content size
+        content_size = 0
+        # Count characters in basic sections
+        basics = optimized.get("basics", {})
+        content_size += len(str(basics.get("summary", "")))
+        
+        # Count work experience content
+        work_items = optimized.get("work", [])
+        for item in work_items:
+            content_size += len(str(item.get("summary", "")))
+            content_size += sum(len(h) for h in item.get("highlights", []))
+        
+        # Count project content
+        projects = optimized.get("projects", [])
+        for proj in projects:
+            content_size += len(str(proj.get("description", "")))
+            content_size += sum(len(h) for h in proj.get("highlights", []))
+        
+        # 2. Set thresholds for trimming
+        # Typical single page can fit around 2500-3000 characters with normal formatting
+        if content_size > 3500:
+            # Aggressive trimming needed
+            summary_limit = 100
+            highlight_limit = 2
+            project_limit = 2
+        elif content_size > 3000:
+            # Moderate trimming
+            summary_limit = 150
+            highlight_limit = 3
+            project_limit = 3
+        else:
+            # Mild optimization
+            summary_limit = 200
+            highlight_limit = 4
+            project_limit = 4
+        
+        # 3. Apply optimization strategies
+        
+        # Trim summary if needed
+        if basics.get("summary") and len(basics["summary"]) > summary_limit:
+            basics["summary"] = basics["summary"][:summary_limit-3] + "..."
+        
+        # Prioritize work and projects based on relevance to job
+        for item in work_items:
+            # Keep only the most relevant highlights
+            if "highlights" in item and len(item["highlights"]) > highlight_limit:
+                # Score highlights by relevance to job description
+                scored_highlights = []
+                for highlight in item["highlights"]:
+                    score = sum(1 for skill in required_skills if skill.lower() in highlight.lower())
+                    scored_highlights.append((highlight, score))
+                
+                # Sort by score and keep only the highest scoring ones
+                item["highlights"] = [h[0] for h in sorted(scored_highlights, 
+                                                          key=lambda x: x[1], 
+                                                          reverse=True)[:highlight_limit]]
+        
+        # Limit projects to the most relevant ones
+        if len(projects) > project_limit:
+            # Score projects by relevance
+            for proj in projects:
+                proj["_relevance"] = sum(1 for skill in required_skills 
+                                        if skill.lower() in str(proj).lower())
+            
+            # Keep only the most relevant projects
+            optimized["projects"] = sorted(projects, 
+                                          key=lambda x: x["_relevance"], 
+                                          reverse=True)[:project_limit]
+            
+            # Remove the temporary scoring attribute
+            for proj in optimized["projects"]:
+                if "_relevance" in proj:
+                    proj.pop("_relevance")
+        
+        return optimized
+
 
 def main():
     parser = argparse.ArgumentParser(description='Generate a tailored resume from JSON data.')
@@ -904,7 +1031,10 @@ def main():
     parser.add_argument('--job', required=True, help='Path to a text file containing the job description')
     parser.add_argument('--output', help='Output file name')
     parser.add_argument('--output-dir', help='Target directory for the generated resume')
-    parser.add_argument('--format', default='markdown', choices=['markdown', 'json', 'html', 'pdf'], help='Output format')
+    parser.add_argument('--format', default='markdown', choices=['markdown', 'json', 'html', 'pdf'], 
+                        help='Output format')
+    parser.add_argument('--page-limit', default='auto', choices=['auto', 'single-page', 'multi-page'],
+                        help='Page limit constraints')
 
     args = parser.parse_args()
 
@@ -916,7 +1046,7 @@ def main():
         return
 
     generator = ResumeGenerator(args.resume)
-    generator.export_tailored_resume(job_description, args.format, args.output, args.output_dir)
+    generator.export_tailored_resume(job_description, args.format, args.output, args.output_dir, args.page_limit)
 
 
 if __name__ == "__main__":
