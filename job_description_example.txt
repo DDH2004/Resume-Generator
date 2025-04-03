@@ -1,0 +1,17 @@
+# Example Job Description Template
+## Company
+[Company name]
+
+## Role
+[Role title]
+
+## Required Skills
+- [Skill 1]
+- [Skill 2]
+- [Skill 3]
+
+## Responsibilities
+[Job responsibilities]
+
+## Requirements
+[Job requirements]
